@@ -1,0 +1,94 @@
+### Получить все товары
+GET http://localhost:3000/api/products
+
+### Получить товар по ID
+GET http://localhost:3000/api/products/1
+
+### Создать товар
+POST http://localhost:3000/api/products
+Content-Type: application/json
+
+{
+  "name": "Новая электронная книга",
+  "category": "book",
+  "description": "Книга для изучения Node.js",
+  "price": 799,
+  "author": "Иван Иванов",
+  "downloadUrl": "https://example.com/book"
+}
+
+
+
+
+
+
+
+
+
+
+### Обновить товар
+PUT http://localhost:3000/api/products/1
+Content-Type: application/json
+
+{
+  "name": "Обновленная книга",
+  "category": "book",
+  "description": "Новое описание книги",
+  "price": 899,
+  "author": "Иван Иванов",
+  "downloadUrl": "https://example.com/updated-book"
+}
+
+
+
+
+
+
+
+
+
+
+### Удалить товар
+DELETE http://localhost:3000/api/products/1
+
+
+
+
+
+
+
+
+
+### Проверить ошибку 404
+GET http://localhost:3000/api/products/999
+
+
+
+
+
+
+
+
+
+
+
+
+### Проверить ошибку 400
+POST http://localhost:3000/api/products
+Content-Type: application/json
+
+{
+  "name": "",
+  "category": "wrong",
+  "price": -10
+}
+
+
+
+
+
+
+
+
+### Проверить неизвестный маршрут
+GET http://localhost:3000/unknown
