@@ -40,22 +40,28 @@ function validateProductData(data) {
     throw createHttpError(400, 'Цена должна быть числом, большим или равным нулю');
   }
 
+  if (data.stockQuantity !== undefined &&
+      (!Number.isInteger(data.stockQuantity) || data.stockQuantity < 0)) {
+    throw createHttpError(400, 'Количество товара должно быть неотрицательным целым числом');
+  }
+
   return {
     name: data.name.trim(),
     category: data.category,
     description: data.description.trim(),
     price: data.price,
     author: data.author.trim(),
-    downloadUrl: data.downloadUrl.trim()
+    downloadUrl: data.downloadUrl.trim(),
+    stockQuantity: data.stockQuantity ?? 0
   };
 }
 
-function getProducts(req, res) {
-  res.status(200).json(productModel.getAllProducts());
+async function getProducts(req, res) {
+  res.status(200).json(await productModel.getAllProducts());
 }
 
-function getProductById(req, res) {
-  const product = productModel.getProductById(parseProductId(req.params.id));
+async function getProductById(req, res) {
+  const product = await productModel.getProductById(parseProductId(req.params.id));
 
   if (!product) {
     throw createHttpError(404, 'Товар не найден');
@@ -64,14 +70,14 @@ function getProductById(req, res) {
   res.status(200).json(product);
 }
 
-function createProduct(req, res) {
-  const product = productModel.createProduct(validateProductData(req.body));
+async function createProduct(req, res) {
+  const product = await productModel.createProduct(validateProductData(req.body));
   res.status(201).json(product);
 }
 
-function updateProduct(req, res) {
+async function updateProduct(req, res) {
   const id = parseProductId(req.params.id);
-  const product = productModel.updateProduct(id, validateProductData(req.body));
+  const product = await productModel.updateProduct(id, validateProductData(req.body));
 
   if (!product) {
     throw createHttpError(404, 'Товар не найден');
@@ -80,8 +86,8 @@ function updateProduct(req, res) {
   res.status(200).json(product);
 }
 
-function deleteProduct(req, res) {
-  const product = productModel.deleteProduct(parseProductId(req.params.id));
+async function deleteProduct(req, res) {
+  const product = await productModel.deleteProduct(parseProductId(req.params.id));
 
   if (!product) {
     throw createHttpError(404, 'Товар не найден');

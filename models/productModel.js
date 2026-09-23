@@ -1,52 +1,36 @@
-const products = require('../data/products');
+const { Product } = require('./index');
 
 function getAllProducts() {
-  return products;
+  return Product.findAll({ order: [['id', 'ASC']] });
 }
 
 function getProductById(id) {
-  return products.find((product) => product.id === id);
+  return Product.findByPk(id);
 }
 
 function createProduct(productData) {
-  const nextId = products.length > 0
-    ? Math.max(...products.map((product) => product.id)) + 1
-    : 1;
-  const product = {
-    id: nextId,
-    ...productData,
-    createdAt: new Date().toISOString()
-  };
+  return Product.create(productData);
+}
 
-  products.push(product);
+async function updateProduct(id, productData) {
+  const [updatedCount] = await Product.update(productData, { where: { id } });
+
+  if (updatedCount === 0) {
+    return undefined;
+  }
+
+  return Product.findByPk(id);
+}
+
+async function deleteProduct(id) {
+  const product = await Product.findByPk(id);
+
+  if (!product) {
+    return undefined;
+  }
+
+  await product.destroy();
   return product;
-}
-
-function updateProduct(id, productData) {
-  const productIndex = products.findIndex((product) => product.id === id);
-
-  if (productIndex === -1) {
-    return undefined;
-  }
-
-  const updatedProduct = {
-    id,
-    ...productData,
-    createdAt: products[productIndex].createdAt
-  };
-  products[productIndex] = updatedProduct;
-  return updatedProduct;
-}
-
-function deleteProduct(id) {
-  const productIndex = products.findIndex((product) => product.id === id);
-
-  if (productIndex === -1) {
-    return undefined;
-  }
-
-  const deletedProducts = products.splice(productIndex, 1);
-  return deletedProducts[0];
 }
 
 module.exports = {
