@@ -1,13 +1,9 @@
 const productModel = require('../models/productModel');
+const createHttpError = require('../utils/httpError');
 
 const allowedCategories = new Set(['book', 'music', 'software']);
+const PAGE_SIZE = 20;
 const requiredFields = ['name', 'category', 'description', 'author', 'downloadUrl'];
-
-function createHttpError(status, message) {
-  const error = new Error(message);
-  error.status = status;
-  return error;
-}
 
 function parseProductId(value) {
   const id = Number(value);
@@ -17,6 +13,20 @@ function parseProductId(value) {
   }
 
   return id;
+}
+
+function parsePage(value) {
+  if (value === undefined) {
+    return 1;
+  }
+
+  const page = Number(value);
+
+  if (typeof value !== 'string' || value.trim() === '' || !Number.isInteger(page) || page < 1) {
+    throw createHttpError(400, 'Номер страницы должен быть положительным целым числом');
+  }
+
+  return page;
 }
 
 function validateProductData(data) {
@@ -57,7 +67,16 @@ function validateProductData(data) {
 }
 
 async function getProducts(req, res) {
-  res.status(200).json(await productModel.getAllProducts());
+  const page = parsePage(req.query.page);
+  const { rows, count } = await productModel.getProductsPage(page, PAGE_SIZE);
+
+  res.status(200).json({
+    items: rows,
+    page,
+    pageSize: PAGE_SIZE,
+    totalItems: count,
+    totalPages: Math.ceil(count / PAGE_SIZE)
+  });
 }
 
 async function getProductById(req, res) {

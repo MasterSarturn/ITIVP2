@@ -1,7 +1,11 @@
 const { Product } = require('./index');
 
-function getAllProducts() {
-  return Product.findAll({ order: [['id', 'ASC']] });
+function getProductsPage(page, limit) {
+  return Product.findAndCountAll({
+    order: [['id', 'ASC']],
+    limit,
+    offset: (page - 1) * limit
+  });
 }
 
 function getProductById(id) {
@@ -34,7 +38,7 @@ async function deleteProduct(id) {
 }
 
 module.exports = {
-  getAllProducts,
+  getProductsPage,
   getProductById,
   createProduct,
   updateProduct,

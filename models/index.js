@@ -10,8 +10,13 @@ const sequelize = new Sequelize(
   config
 );
 const db = {
-  Product: require('./product')(sequelize, Sequelize.DataTypes)
+  Product: require('./product')(sequelize, Sequelize.DataTypes),
+  User: require('./user')(sequelize, Sequelize.DataTypes),
+  Account: require('./account')(sequelize, Sequelize.DataTypes)
 };
+
+db.User.hasOne(db.Account, { foreignKey: 'userId', as: 'account' });
+db.Account.belongsTo(db.User, { foreignKey: 'userId', as: 'user' });
 
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
