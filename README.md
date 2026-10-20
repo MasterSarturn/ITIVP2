@@ -8,8 +8,8 @@ REST API маркетплейса цифровых товаров: Express + Seq
 npm install
 cp .env.example .env      # при необходимости поменяйте секреты
 npm run db:up             # postgres + mongo в Docker
-npm run db:migrate        # таблицы Products, Users, Accounts
-npm run db:seed           # демо-товары и администратор (ADMIN_EMAIL / ADMIN_PASSWORD из .env)
+npm run db:migrate        # таблицы схемы из db_structure.md
+npm run db:seed           # администратор (ADMIN_EMAIL / ADMIN_PASSWORD из .env), категории и демо-товары
 npm run dev
 ```
 
@@ -37,6 +37,10 @@ npm run dev
 | `ACCESS_TOKEN_EXPIRES_IN` | срок жизни access-токена (например `1h`) |
 | `REFRESH_TOKEN_EXPIRES_IN` | срок жизни refresh-токена (например `7d`) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | учётные данные администратора, создаваемого сидером |
+| `STORAGE_DIR` | каталог локального хранилища файлов товаров (по умолчанию `./storage`) |
+| `MAX_UPLOAD_SIZE` | максимальный размер загружаемого файла в байтах (по умолчанию 50 МБ) |
+| `PAYMENT_WEBHOOK_SECRET` | секрет подписи webhook платёжного провайдера (HMAC-SHA256). В production обязателен |
+| `DOWNLOAD_TTL_SECONDS` | время, в течение которого после `POST /api/downloads` можно забрать файл (по умолчанию 300) |
 
 ## Эндпоинты
 
@@ -46,7 +50,8 @@ npm run dev
 - Тело запросов и ответов — JSON, заголовок `Content-Type: application/json`.
 - Защищённые маршруты требуют заголовок `Authorization: Bearer <accessToken>`. Токен выдаёт `POST /auth/login` (после `POST /auth/register`).
 - Refresh-токен в теле ответа не возвращается: он приходит в cookie `refreshToken` (`HttpOnly`, `SameSite=Strict`, `Path=/auth`; `Secure` при `NODE_ENV=production`) и читается из неё же в `/auth/refresh` и `/auth/logout`. Клиенту нужно отправлять запросы с cookie (в браузере — `credentials: 'include'`).
-- Создание, изменение и удаление товаров доступны только администратору (роль `admin`), иначе **403**. Чтение товаров — без авторизации.
+- Роли: `user`, `seller`, `admin` (роль лежит в JWT и выдаётся только администратором, при смене роли токены пользователя отзываются). Полная матрица прав и правила по каждому эндпоинту — в [access_matrix.md](access_matrix.md). Коды: **403** — не хватает роли или запись чужая и видимая, **404** — записи нет или она скрыта от пользователя, **409** — конфликт состояния.
+- Все списки постраничные (`?page=`, по 20 записей). Деньги и размеры файлов в ответах — строки (`DECIMAL`, `BIGINT`).
 - Любая ошибка возвращается как `{ "error": "текст ошибки" }` с соответствующим HTTP-статусом. Для защищённых маршрутов без токена, с неверным, просроченным или отозванным токеном — **401**. Неизвестный маршрут — **404**, непредвиденная ошибка — **500**.
 
 ### Сводка
@@ -62,9 +67,29 @@ npm run dev
 | DELETE | `/profile` | Bearer | 204 | удаление профиля |
 | GET | `/api/products` | — | 200 | список товаров (страница по 20) |
 | GET | `/api/products/:id` | — | 200 | товар по ID |
-| POST | `/api/products` | admin | 201 | создание товара |
-| PUT | `/api/products/:id` | admin | 200 | полное обновление товара |
-| DELETE | `/api/products/:id` | admin | 204 | удаление товара |
+| GET | `/api/products/mine` | seller, admin | 200 | собственные товары во всех статусах |
+| POST | `/api/products` | seller, admin | 201 | создание товара (всегда `draft`) |
+| PUT | `/api/products/:id` | владелец, admin | 200 | полное обновление товара |
+| PATCH | `/api/products/:id/status` | владелец, admin | 200 | публикация и снятие с публикации |
+| DELETE | `/api/products/:id` | владелец, admin | 204 | архивация товара (`status = archived`) |
+| GET, POST | `/api/products/:productId/files` | Bearer | 200, 201 | список файлов (владелец, admin, покупатель) и загрузка (`multipart/form-data`) |
+| PUT, DELETE | `/api/products/:productId/files/:fileId` | владелец, admin | 201, 204 | замена новой версией и мягкое удаление файла |
+| GET, POST | `/api/products/:id/reviews` | —, Bearer | 200, 201 | отзывы товара, отзыв на купленный товар |
+| PATCH, DELETE | `/api/reviews/:id` | Bearer | 200, 204 | свой отзыв (удалять чужой может admin) |
+| PATCH | `/profile/password`, `/profile/email` | Bearer | 200 | смена пароля и email, выдаётся новая пара токенов |
+| GET | `/api/categories`, `/api/authors`, `/api/authors/:id` | — | 200 | справочники |
+| POST, PATCH, DELETE | `/api/categories`, `/api/authors` | admin (авторов создаёт и seller) | 201, 200, 204 | управление справочниками |
+| GET, POST, DELETE | `/api/cart`, `/api/cart/items`, `/api/cart/items/:productId` | Bearer | 200, 201, 204 | корзина |
+| GET, POST, DELETE | `/api/wishlist`, `/api/wishlist/:productId` | Bearer | 200, 201, 204 | избранное |
+| POST, GET | `/api/orders`, `/api/orders/:id` | Bearer | 201, 200 | оформление заказа из корзины и просмотр |
+| POST | `/api/orders/:id/cancel` | владелец, admin | 200 | отмена заказа в статусе `pending` |
+| POST, GET | `/api/orders/:id/payments` | Bearer | 201, 200 | платёжная операция по заказу и список платежей |
+| POST | `/api/payments/webhook` | подпись HMAC | 200 | результат платежа от провайдера, единственный способ перевести заказ в `paid` |
+| POST | `/api/dev/payments/:id/simulate` | Bearer | 200 | имитация ответа провайдера (только при `NODE_ENV` не `production`) |
+| POST, GET | `/api/downloads`, `/api/downloads/:id/content` | Bearer | 201, 200 | запрос скачивания купленного файла и получение файла в пределах TTL |
+| GET | `/api/seller/sales` | seller, admin | 200 | оплаченные позиции по своим товарам |
+| GET, PATCH, DELETE | `/api/admin/users...` | admin | 200, 204 | пользователи: список, профиль, статус, роль, удаление |
+| GET, POST | `/api/admin/products`, `orders`, `payments`, `downloads`, `orders/:id/refund` | admin | 200 | списки всех данных и возврат оплаченного заказа |
 
 ### Аутентификация
 
@@ -141,11 +166,11 @@ Refresh-токен устанавливается заголовком `Set-Cook
 
 ### Товары
 
-Параметр `:id` — положительное целое число, иначе **400**. Если товар не найден — **404**.
+Параметры `:id`, `:productId`, `:fileId` — UUID, иначе **400**. Гость и обычный пользователь видят только опубликованные товары активных продавцов; владелец и администратор — любой статус; для остальных скрытый товар — **404**. Подробные схемы тел запросов и ответов всех эндпоинтов — в Swagger.
 
 #### `GET /api/products`
 
-Query: `page` — номер страницы (по умолчанию 1), на странице 20 товаров, отсортированных по `id`.
+Query: `page` — номер страницы (по умолчанию 1), на странице 20 товаров, отсортированных по дате создания; фильтры `categorySlug`, `authorId`, `q` (поиск по названию и описанию).
 
 **200** →
 
@@ -161,39 +186,53 @@ Query: `page` — номер страницы (по умолчанию 1), на 
 
 ```json
 {
-  "id": 1, "name": "Node.js для начинающих", "category": "book", "description": "...",
-  "price": "799.00", "author": "Иван Иванов", "downloadUrl": "https://example.com/book",
-  "stockQuantity": 0, "createdAt": "ISO-дата", "updatedAt": "ISO-дата"
+  "id": "uuid", "sellerId": "uuid", "categoryId": "uuid", "name": "Node.js для начинающих",
+  "description": "...", "price": "799.00", "status": "published",
+  "category": { "id": "uuid", "name": "Books", "slug": "books" },
+  "authors": [ { "id": "uuid", "name": "Иван Иванов" } ],
+  "seller": { "id": "uuid", "firstName": "Пётр", "lastName": "Петров" },
+  "createdAt": "ISO-дата", "updatedAt": "ISO-дата"
 }
 ```
 
 `price` хранится как `DECIMAL(10,2)`, поэтому в ответе это **строка**.
 
-#### `POST /api/products`, `PUT /api/products/:id` — admin
+#### `POST /api/products`, `PUT /api/products/:id` — seller, admin
 
 ```json
-{
-  "name": "Node.js для начинающих", "category": "book", "description": "Книга для изучения Node.js",
-  "price": 799, "author": "Иван Иванов", "downloadUrl": "https://example.com/book", "stockQuantity": 10
-}
+{ "name": "Node.js для начинающих", "category": "books", "description": "Книга для изучения Node.js", "price": 799, "authorIds": ["uuid"] }
 ```
 
-- `name`, `description`, `author`, `downloadUrl` — обязательные непустые строки;
-- `category` — `book`, `music` или `software`;
-- `price` — обязательное число ≥ 0 (в запросе именно число, не строка);
-- `stockQuantity` — необязательно, целое ≥ 0, по умолчанию 0.
+- `name`, `description` — обязательные непустые строки;
+- `category` — обязательный slug существующей категории (`books`, `music`, `software` после `db:seed`), иначе **400**;
+- `price` — обязательное число ≥ 0 не более чем с двумя знаками после запятой (в запросе именно число, не строка);
+- `authorIds` — необязательный массив `Author.id`; при `PUT` набор авторов заменяется целиком, если поле передано;
+- `sellerId` — только при создании и только для администратора (продавец с ролью `seller` или `admin`); иначе продавцом становится автор запроса.
 
-`PUT` заменяет товар целиком, поэтому требует те же поля, что и `POST`.
-**201** (POST) / **200** (PUT) → товар. Ошибки: **400**, **401**, **403** — не администратор, **404** (PUT).
+Товар всегда создаётся черновиком (`draft`), `status` в теле игнорируется. `PUT` заменяет товар целиком, поэтому требует те же поля, что и `POST`.
+**201** (POST) / **200** (PUT) → товар. Ошибки: **400**, **401**, **403** — нет роли или чужой видимый товар, **404**.
 
-#### `DELETE /api/products/:id` — admin
+#### `PATCH /api/products/:id/status` — владелец, admin
 
-**204** без тела. Ошибки: **400**, **401**, **403**, **404**.
+Тело `{ "status": "published" | "draft" }`. Публикация требует хотя бы один активный файл (иначе **409**). Из `archived` в `draft` возвращает только администратор. В `archived` товар переводит `DELETE`.
+
+#### `DELETE /api/products/:id` — владелец, admin
+
+Товар физически не удаляется, а переводится в `archived`; купившие сохраняют доступ к файлам. **204** без тела. Ошибки: **400**, **401**, **403**, **404**.
+
+### Файлы, заказы и платежи
+
+- **Файлы.** Загрузка — `multipart/form-data` с полем `file` (и необязательным `version`). Тип определяется сервером по расширению из белого списка (**415** для остальных), размер ограничен `MAX_UPLOAD_SIZE` (**413**). Удаление и замена мягкие (`deletedAt`): покупатели, оплатившие заказ до удаления, сохраняют доступ.
+- **Заказ** создаётся из корзины одной транзакцией, цена фиксируется в позиции. Заказ на 0 сразу получает статус `paid`. Статусы меняются только отменой (`pending → cancelled`), возвратом администратором (`paid → refunded`) и результатом платежа.
+- **Платёж.** Провайдер в проекте не задан: подключена заглушка `mock` (`services/paymentProvider.js`). Webhook подписывается HMAC-SHA256 от сырого тела с секретом `PAYMENT_WEBHOOK_SECRET` (заголовок `X-Signature`, hex), обработка идемпотентна по `(provider, externalPaymentId)`. Для разработки есть `POST /api/dev/payments/:id/simulate`.
+- **Скачивание** двумя шагами: `POST /api/downloads` (проверка оплаты, запись `Download`, ответ `{ id, expiresAt }`) и `GET /api/downloads/:id/content` (поток файла, пока не истёк TTL; после возврата заказа — **403**, после TTL — **410**).
+- **Хранилище** — локальный диск (`STORAGE_DIR`, в `.gitignore`) за интерфейсом `services/storageService.js`.
 
 ## Модели данных
 
 - **User** (PostgreSQL): `id` (UUID), `firstName`, `lastName`, `createdAt`, `updatedAt`.
-- **Account** (PostgreSQL): `id`, `userId` (FK → User, 1:1), `email` (уникальный), `passwordHash` (bcrypt, 10 раундов), `role` (`user | admin`, по умолчанию `user`), `status` (`active | blocked | deleted`), `lastLoginAt`, `failedLoginAttempts`, `lockUntil`.
+- **Account** (PostgreSQL): `id`, `userId` (FK → User, 1:1), `email` (уникальный), `passwordHash` (bcrypt, 10 раундов), `role` (`user | seller | admin`, по умолчанию `user`), `status` (`active | blocked | deleted`), `lastLoginAt`, `failedLoginAttempts`, `lockUntil`.
+- Остальные таблицы PostgreSQL (`Categories`, `Authors`, `Products`, `ProductAuthors`, `ProductFiles`, `Carts`, `CartItems`, `Orders`, `OrderItems`, `Payments`, `Downloads`, `Reviews`, `WishlistItems`) описаны в [db_structure.md](db_structure.md); модели лежат в `server/models/`. HTTP-эндпоинтов для них, кроме `/api/products`, пока нет.
 - **Token** (MongoDB, коллекция `tokens`): `userId`, `token`, `type` (`access | refresh`), `expiresAt`, `createdAt`.
 
 ## Блокировка после неудачных попыток входа
@@ -221,3 +260,8 @@ docker exec -it digital-marketplace-mongo mongosh digital_marketplace --eval "db
 ## Ручные тесты
 
 Готовые запросы — в `api-tests.http`. Откройте файл в VS Code с расширением REST Client (`humao.rest-client`) и выполняйте запросы сверху вниз кнопкой **Send Request**. Access-токены и ID товара подставляются автоматически, refresh-токен REST Client хранит в cookie сам. Для запросов администратора нужен аккаунт из `ADMIN_EMAIL` / `ADMIN_PASSWORD` (создаётся `npm run db:seed`).
+
+## Структура проекта
+
+- `server/` — бэкенд (Express + Sequelize). Запуск: `cd server && npm install && npm run dev`.
+- `client/` — фронтенд (React + Vite), пока автономный, данные хранятся в localStorage. Запуск: `cd client && npm install && npm run dev`.
