@@ -108,7 +108,7 @@ function listBySeller(sellerId, { page, status }) {
   return paginate(Product, page, { where, include: productInclude, distinct: true, order: DESC });
 }
 
-function listAll({ page, status, sellerId }) {
+function listAll({ page, status, sellerId, q }) {
   const where = {};
 
   if (status !== undefined) {
@@ -117,6 +117,10 @@ function listAll({ page, status, sellerId }) {
 
   if (sellerId !== undefined) {
     where.sellerId = parseUuid(sellerId, 'sellerId');
+  }
+
+  if (typeof q === 'string' && q.trim() !== '') {
+    where.name = { [Op.iLike]: likePattern(q.trim()) };
   }
 
   return paginate(Product, page, { where, include: productInclude, distinct: true, order: DESC });

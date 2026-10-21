@@ -89,6 +89,7 @@ npm run dev
 | POST, GET | `/api/downloads`, `/api/downloads/:id/content` | Bearer | 201, 200 | запрос скачивания купленного файла и получение файла в пределах TTL |
 | GET | `/api/seller/sales` | seller, admin | 200 | оплаченные позиции по своим товарам |
 | GET, PATCH, DELETE | `/api/admin/users...` | admin | 200, 204 | пользователи: список, профиль, статус, роль, удаление |
+| GET | `/api/admin/stats` | admin | 200 | сводка для обзора: счётчики, выручка, динамика за 30 дней, топ-5 товаров, последние заказы |
 | GET, POST | `/api/admin/products`, `orders`, `payments`, `downloads`, `orders/:id/refund` | admin | 200 | списки всех данных и возврат оплаченного заказа |
 
 ### Аутентификация

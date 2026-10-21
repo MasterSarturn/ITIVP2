@@ -674,6 +674,10 @@ Authorization: Bearer {{sellerToken}}
 GET {{baseUrl}}/api/seller/sales
 Authorization: Bearer {{buyerToken}}
 
+### Сводка для обзора админки (200)
+GET {{baseUrl}}/api/admin/stats
+Authorization: Bearer {{adminLogin2.response.body.accessToken}}
+
 ### Все заказы админом (200)
 GET {{baseUrl}}/api/admin/orders?status=paid
 Authorization: Bearer {{adminLogin2.response.body.accessToken}}

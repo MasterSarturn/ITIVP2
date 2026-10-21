@@ -13,6 +13,20 @@ router.param('id', uuidParam);
 
 /**
  * @openapi
+ * /api/admin/stats:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Сводка для обзора админки
+ *     description: Счётчики пользователей, товаров и заказов, выручка оплаченных заказов, динамика за 30 дней, топ-5 товаров и 5 последних заказов. Суммы - строки.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Сводка
+ */
+router.get('/stats', asyncHandler(adminController.getStats));
+
+/**
+ * @openapi
  * /api/admin/users:
  *   get:
  *     tags: [Admin]
@@ -177,6 +191,7 @@ router.delete('/users/:id', asyncHandler(adminController.deleteUser));
  *       - $ref: '#/components/parameters/Page'
  *       - { name: status, in: query, schema: { type: string, enum: [draft, published, archived] } }
  *       - { name: sellerId, in: query, schema: { type: string, format: uuid } }
+ *       - { name: q, in: query, schema: { type: string }, description: Поиск по названию }
  *     responses:
  *       200:
  *         description: Страница товаров

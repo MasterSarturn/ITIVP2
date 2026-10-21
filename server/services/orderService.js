@@ -1,4 +1,4 @@
-const { sequelize, Order, OrderItem, Payment, Product, CartItem } = require('../models');
+const { sequelize, Order, OrderItem, Payment, Product, CartItem, User, Account } = require('../models');
 const cartService = require('./cartService');
 const paymentProvider = require('./paymentProvider');
 const { hasPurchased } = require('./accessService');
@@ -86,7 +86,13 @@ function listAllOrders({ page, status, userId }) {
     where.userId = parseUuid(userId, 'userId');
   }
 
-  return paginate(Order, page, { where, include: orderInclude, distinct: true, order: DESC });
+  // админу нужен покупатель: email виден только ему
+  const include = [
+    ...orderInclude,
+    { model: User, as: 'user', attributes: ['id', 'firstName', 'lastName'], include: [{ model: Account, as: 'account', attributes: ['email'] }] }
+  ];
+
+  return paginate(Order, page, { where, include, distinct: true, order: DESC });
 }
 
 // Чужой заказ для обычного пользователя не существует (404), Admin читает любые

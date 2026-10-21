@@ -3,7 +3,12 @@ const productService = require('../services/productService');
 const orderService = require('../services/orderService');
 const paymentService = require('../services/paymentService');
 const downloadService = require('../services/downloadService');
+const statsService = require('../services/statsService');
 const { parsePage } = require('../utils/validators');
+
+async function getStats(req, res) {
+  res.status(200).json(await statsService.getStats());
+}
 
 async function listUsers(req, res) {
   const { status, role, q } = req.query;
@@ -32,8 +37,8 @@ async function deleteUser(req, res) {
 }
 
 async function listProducts(req, res) {
-  const { status, sellerId } = req.query;
-  res.status(200).json(await productService.listAll({ page: parsePage(req.query.page), status, sellerId }));
+  const { status, sellerId, q } = req.query;
+  res.status(200).json(await productService.listAll({ page: parsePage(req.query.page), status, sellerId, q }));
 }
 
 async function listOrders(req, res) {
@@ -56,6 +61,7 @@ async function listDownloads(req, res) {
 }
 
 module.exports = {
+  getStats,
   listUsers,
   getUser,
   updateUser,
