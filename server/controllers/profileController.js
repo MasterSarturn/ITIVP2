@@ -17,6 +17,10 @@ async function changeEmail(req, res) {
   sendTokens(res, await accountService.changeEmail(req.user.id, req.body));
 }
 
+async function becomeSeller(req, res) {
+  sendTokens(res, await accountService.becomeSeller(req.user.id));
+}
+
 async function deleteProfile(req, res) {
   await accountService.deleteAccount(req.user.id);
   clearRefreshCookie(res);
@@ -28,5 +32,6 @@ module.exports = {
   updateProfile,
   changePassword,
   changeEmail,
+  becomeSeller,
   deleteProfile
 };

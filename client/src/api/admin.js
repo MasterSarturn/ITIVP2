@@ -1,6 +1,6 @@
 import { get, post, put, patch, del, request } from './http'
 
-export const stats = () => get('/api/admin/stats')
+export const stats = (days) => get('/api/admin/stats', { days })
 
 export const users = {
   list: (params) => get('/api/admin/users', params),
@@ -32,6 +32,12 @@ export const products = {
     return request(`/api/products/${id}/files/${fileId}`, { method: 'PUT', form })
   },
   removeFile: (id, fileId) => del(`/api/products/${id}/files/${fileId}`),
+  setImage: (id, image) => {
+    const form = new FormData()
+    form.append('image', image)
+    return request(`/api/products/${id}/image`, { method: 'PUT', form })
+  },
+  removeImage: (id) => del(`/api/products/${id}/image`),
 }
 
 export const orders = {
@@ -50,6 +56,13 @@ export const categories = {
   create: (body) => post('/api/categories', body),
   update: (id, body) => patch(`/api/categories/${id}`, body),
   remove: (id) => del(`/api/categories/${id}`),
+}
+
+export const promoCodes = {
+  list: (params) => get('/api/admin/promo-codes', params),
+  create: (body) => post('/api/admin/promo-codes', body),
+  update: (id, body) => patch(`/api/admin/promo-codes/${id}`, body),
+  remove: (id) => del(`/api/admin/promo-codes/${id}`),
 }
 
 export const authors = {

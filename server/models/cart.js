@@ -11,6 +11,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.UUID,
       allowNull: false,
       unique: true
+    },
+    promoCodeId: {
+      type: DataTypes.UUID,
+      allowNull: true
     }
   });
 

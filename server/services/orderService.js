@@ -1,5 +1,7 @@
-const { sequelize, Order, OrderItem, Payment, Product, CartItem, User, Account } = require('../models');
+const { sequelize, Order, OrderItem, Payment, Product, CartItem, User, Account, PromoCode } = require('../models');
 const cartService = require('./cartService');
+const promoService = require('./promoService');
+const { evaluatePromo } = require('../utils/promo');
 const paymentProvider = require('./paymentProvider');
 const { hasPurchased } = require('./accessService');
 const { paginate, DESC } = require('../utils/pagination');
@@ -13,7 +15,7 @@ const ORDER_STATUSES = ['pending', 'paid', 'cancelled', 'refunded'];
 const orderInclude = [{
   model: OrderItem,
   as: 'items',
-  include: [{ model: Product, as: 'product', attributes: ['id', 'name'] }]
+  include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'imageKey', 'imageUrl'] }]
 }];
 
 function loadOrder(id, options = {}) {
@@ -50,11 +52,35 @@ async function createOrder(user) {
       totalCents += toCents(product.price);
     }
 
-    // бесплатный заказ платежа не требует и сразу считается оплаченным
+    // промокод пересчитывается под блокировкой строки: два заказа не превысят maxUses
+    let discountCents = 0;
+    let promo = null;
+
+    if (cart.promoCodeId) {
+      promo = await PromoCode.findByPk(cart.promoCodeId, { lock: transaction.LOCK.UPDATE, transaction });
+
+      if (promo) {
+        const result = evaluatePromo(promo, totalCents);
+
+        if (result.problem) {
+          throw createHttpError(409, `${result.problem}. Уберите промокод из корзины или замените его`);
+        }
+
+        discountCents = result.discountCents;
+        await promo.increment('usedCount', { transaction });
+      }
+    }
+
+    const payableCents = totalCents - discountCents;
+
+    // бесплатный заказ (в том числе после скидки) платежа не требует и сразу считается оплаченным
     const order = await Order.create({
       userId: user.id,
-      status: totalCents === 0 ? 'paid' : 'pending',
-      totalAmount: fromCents(totalCents)
+      status: payableCents === 0 ? 'paid' : 'pending',
+      totalAmount: fromCents(payableCents),
+      discountAmount: fromCents(discountCents),
+      promoCodeId: promo ? promo.id : null,
+      promoCode: promo ? promo.code : null
     }, { transaction });
 
     // unitPrice фиксирует цену на момент заказа
@@ -63,6 +89,7 @@ async function createOrder(user) {
       { transaction }
     );
     await CartItem.destroy({ where: { cartId: cart.id }, transaction });
+    await cart.update({ promoCodeId: null }, { transaction });
 
     return order.id;
   });
@@ -119,6 +146,7 @@ async function cancelOrder(user, id) {
     }
 
     await order.update({ status: 'cancelled' }, { transaction });
+    await promoService.release([order], transaction);
     await Payment.update({ status: 'failed' }, { where: { orderId: order.id, status: 'pending' }, transaction });
   });
 
@@ -153,7 +181,7 @@ async function refundOrder(admin, id) {
 
 // Отмена незавершённых заказов пользователя при удалении его аккаунта
 async function cancelPendingOrders(userId, transaction) {
-  const orders = await Order.findAll({ where: { userId, status: 'pending' }, attributes: ['id'], transaction });
+  const orders = await Order.findAll({ where: { userId, status: 'pending' }, attributes: ['id', 'promoCodeId'], transaction });
   const orderIds = orders.map((order) => order.id);
 
   if (orderIds.length === 0) {
@@ -161,6 +189,7 @@ async function cancelPendingOrders(userId, transaction) {
   }
 
   await Order.update({ status: 'cancelled' }, { where: { id: orderIds }, transaction });
+  await promoService.release(orders, transaction);
   await Payment.update({ status: 'failed' }, { where: { orderId: orderIds, status: 'pending' }, transaction });
 }
 

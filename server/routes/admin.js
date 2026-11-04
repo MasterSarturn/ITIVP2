@@ -19,11 +19,107 @@ router.param('id', uuidParam);
  *     summary: Сводка для обзора админки
  *     description: Счётчики пользователей, товаров и заказов, выручка оплаченных заказов, динамика за 30 дней, топ-5 товаров и 5 последних заказов. Суммы - строки.
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { name: days, in: query, schema: { type: integer, enum: [7, 30, 90], default: 30 }, description: Окно динамики, воронки и категорий }
  *     responses:
  *       200:
  *         description: Сводка
  */
 router.get('/stats', asyncHandler(adminController.getStats));
+
+/**
+ * @openapi
+ * /api/admin/users/export.csv:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Экспорт CSV - пользователи
+ *     description: Те же фильтры, что у списка, но все страницы (до 10 000 строк). UTF-8 с BOM, разделитель «;».
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: status, in: query, schema: { type: string, enum: [active, blocked, deleted] } }
+ *       - { name: role, in: query, schema: { type: string, enum: [user, seller, admin] } }
+ *       - { name: q, in: query, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Файл CSV
+ *         content:
+ *           text/csv:
+ *             schema: { type: string }
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.get('/users/export.csv', asyncHandler(adminController.exportUsers));
+
+/**
+ * @openapi
+ * /api/admin/orders/export.csv:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Экспорт CSV - заказы
+ *     description: Те же фильтры, что у списка, но все страницы (до 10 000 строк). UTF-8 с BOM, разделитель «;».
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: status, in: query, schema: { type: string } }
+ *       - { name: userId, in: query, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200:
+ *         description: Файл CSV
+ *         content:
+ *           text/csv:
+ *             schema: { type: string }
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.get('/orders/export.csv', asyncHandler(adminController.exportOrders));
+
+/**
+ * @openapi
+ * /api/admin/payments/export.csv:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Экспорт CSV - платежи
+ *     description: Те же фильтры, что у списка, но все страницы (до 10 000 строк). UTF-8 с BOM, разделитель «;».
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: status, in: query, schema: { type: string } }
+ *       - { name: orderId, in: query, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200:
+ *         description: Файл CSV
+ *         content:
+ *           text/csv:
+ *             schema: { type: string }
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.get('/payments/export.csv', asyncHandler(adminController.exportPayments));
+
+/**
+ * @openapi
+ * /api/admin/products/export.csv:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Экспорт CSV - товары
+ *     description: Те же фильтры, что у списка, но все страницы (до 10 000 строк). UTF-8 с BOM, разделитель «;».
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: status, in: query, schema: { type: string } }
+ *       - { name: sellerId, in: query, schema: { type: string, format: uuid } }
+ *       - { name: q, in: query, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Файл CSV
+ *         content:
+ *           text/csv:
+ *             schema: { type: string }
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.get('/products/export.csv', asyncHandler(adminController.exportProducts));
 
 /**
  * @openapi
@@ -276,5 +372,97 @@ router.get('/payments', asyncHandler(adminController.listPayments));
  *         description: Страница скачиваний
  */
 router.get('/downloads', asyncHandler(adminController.listDownloads));
+
+/**
+ * @openapi
+ * /api/admin/promo-codes:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Список промокодов
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/Page'
+ *       - { name: isActive, in: query, schema: { type: string, enum: ['true', 'false'] } }
+ *       - { name: q, in: query, schema: { type: string }, description: Поиск по коду }
+ *     responses:
+ *       200:
+ *         description: Страница промокодов
+ */
+router.get('/promo-codes', asyncHandler(adminController.listPromoCodes));
+
+/**
+ * @openapi
+ * /api/admin/promo-codes:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Создать промокод
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code, type, value]
+ *             properties:
+ *               code: { type: string, example: SALE10 }
+ *               type: { type: string, enum: [percent, fixed] }
+ *               value: { type: number, description: Процент (0.01-100) или сумма в BYN }
+ *               minOrderAmount: { type: number, default: 0 }
+ *               maxUses: { type: integer, nullable: true }
+ *               expiresAt: { type: string, format: date-time, nullable: true }
+ *               isActive: { type: boolean, default: true }
+ *     responses:
+ *       201:
+ *         description: Промокод создан
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ */
+router.post('/promo-codes', asyncHandler(adminController.createPromoCode));
+
+/**
+ * @openapi
+ * /api/admin/promo-codes/{id}:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Изменить промокод
+ *     description: Код и тип менять нельзя. Размер скидки - только пока код не использован.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/Id'
+ *     responses:
+ *       200:
+ *         description: Промокод обновлён
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ */
+router.patch('/promo-codes/:id', asyncHandler(adminController.updatePromoCode));
+
+/**
+ * @openapi
+ * /api/admin/promo-codes/{id}:
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Удалить неиспользованный промокод
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/Id'
+ *     responses:
+ *       204:
+ *         description: Удалён
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         description: Использован в заказах, отключите вместо удаления
+ */
+router.delete('/promo-codes/:id', asyncHandler(adminController.deletePromoCode));
 
 module.exports = router;

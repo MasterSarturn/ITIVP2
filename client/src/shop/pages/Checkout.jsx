@@ -69,6 +69,11 @@ export default function Checkout() {
             <li key={item.id}><span>{item.product.name}</span><span className="mono">{formatMoney(item.unitPrice)}</span></li>
           ))}
         </ul>
+        {Number(data.discountAmount) > 0 && (
+          <p className="muted" style={{ margin: 0 }}>
+            Скидка по промокоду {data.promoCode}: −{formatMoney(data.discountAmount)} BYN
+          </p>
+        )}
         {note && <div className="alert info">{note}</div>}
 
         {data.status === 'pending' && (

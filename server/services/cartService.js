@@ -1,10 +1,11 @@
-const { Sequelize, Cart, CartItem, Product, Account } = require('../models');
+const { Sequelize, Cart, CartItem, Product, Account, PromoCode } = require('../models');
+const { evaluatePromo, describePromo } = require('../utils/promo');
 const { hasPurchased } = require('./accessService');
 const { toCents, fromCents } = require('../utils/money');
 const { parseUuid, requireBody } = require('../utils/validators');
 const createHttpError = require('../utils/httpError');
 
-const productAttributes = ['id', 'sellerId', 'name', 'price', 'status'];
+const productAttributes = ['id', 'sellerId', 'name', 'price', 'status', 'imageKey', 'imageUrl'];
 
 // Корзина создаётся лениво при первом обращении (Cart.userId UNIQUE)
 async function getOrCreateCart(userId, transaction) {
@@ -30,11 +31,10 @@ async function loadItems(cartId, transaction) {
   });
 }
 
-async function getCart(userId) {
-  const cart = await getOrCreateCart(userId);
-  const items = await loadItems(cart.id);
+// Позиции корзины с признаком доступности и сумма только по доступным
+async function summarize(cartId) {
+  const items = await loadItems(cartId);
   let totalCents = 0;
-
   const result = [];
 
   for (const item of items) {
@@ -48,11 +48,30 @@ async function getCart(userId) {
       productId: item.productId,
       addedAt: item.createdAt,
       available,
-      product: { id: item.product.id, name: item.product.name, price: item.product.price, status: item.product.status }
+      product: { id: item.product.id, name: item.product.name, price: item.product.price, status: item.product.status, imageUrl: item.product.imageUrl }
     });
   }
 
-  return { id: cart.id, items: result, totalAmount: fromCents(totalCents) };
+  return { items: result, totalCents };
+}
+
+// totalAmount - итог к оплате с учётом промокода. Если выбранный код перестал действовать,
+// скидка не считается, а причина возвращается в promoProblem
+async function getCart(userId) {
+  const cart = await getOrCreateCart(userId);
+  const { items, totalCents } = await summarize(cart.id);
+  const promo = cart.promoCodeId ? await PromoCode.findByPk(cart.promoCodeId) : null;
+  const { discountCents, problem } = promo ? evaluatePromo(promo, totalCents) : { discountCents: 0, problem: null };
+
+  return {
+    id: cart.id,
+    items,
+    subtotalAmount: fromCents(totalCents),
+    discountAmount: fromCents(discountCents),
+    totalAmount: fromCents(totalCents - discountCents),
+    promo: promo ? describePromo(promo) : null,
+    promoProblem: problem
+  };
 }
 
 async function addItem(user, body) {
@@ -100,6 +119,7 @@ async function removeItem(userId, productId) {
 async function clearCart(userId) {
   const cart = await getOrCreateCart(userId);
   await CartItem.destroy({ where: { cartId: cart.id } });
+  await cart.update({ promoCodeId: null });
 }
 
-module.exports = { getCart, addItem, removeItem, clearCart, getOrCreateCart, loadItems, isAvailable };
+module.exports = { getCart, summarize, addItem, removeItem, clearCart, getOrCreateCart, loadItems, isAvailable };

@@ -11,7 +11,7 @@ const sequelize = new Sequelize(
 );
 const models = [
   'user', 'account', 'category', 'author', 'product', 'productAuthor', 'productFile',
-  'cart', 'cartItem', 'order', 'orderItem', 'payment', 'download', 'review', 'wishlistItem'
+  'cart', 'cartItem', 'order', 'orderItem', 'payment', 'download', 'review', 'wishlistItem', 'promoCode'
 ];
 const db = {};
 
@@ -22,7 +22,7 @@ for (const name of models) {
 
 const {
   User, Account, Category, Author, Product, ProductAuthor, ProductFile,
-  Cart, CartItem, Order, OrderItem, Payment, Download, Review, WishlistItem
+  Cart, CartItem, Order, OrderItem, Payment, Download, Review, WishlistItem, PromoCode
 } = db;
 
 // Политика ON DELETE / ON UPDATE описана в db_structure.md
@@ -57,6 +57,13 @@ Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items', ...cascade });
 OrderItem.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+// Удаление промокода не должно ломать заказы и корзины: ссылка обнуляется
+const setNull = { onDelete: 'SET NULL', onUpdate: 'CASCADE' };
+PromoCode.hasMany(Cart, { foreignKey: 'promoCodeId', as: 'carts', ...setNull });
+Cart.belongsTo(PromoCode, { foreignKey: 'promoCodeId', as: 'promo' });
+PromoCode.hasMany(Order, { foreignKey: 'promoCodeId', as: 'orders', ...setNull });
+Order.belongsTo(PromoCode, { foreignKey: 'promoCodeId', as: 'promo' });
+
 Product.hasMany(OrderItem, { foreignKey: 'productId', as: 'orderItems', ...restrict });
 OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 

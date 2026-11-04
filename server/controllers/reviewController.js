@@ -20,7 +20,13 @@ async function deleteReview(req, res) {
 }
 
 async function listSales(req, res) {
-  res.status(200).json(await salesService.listSales(req.user.id, parsePage(req.query.page)));
+  res.status(200).json(
+    await salesService.listSales(req.user.id, parsePage(req.query.page), { productId: req.query.productId })
+  );
 }
 
-module.exports = { listReviews, createReview, updateReview, deleteReview, listSales };
+async function getSellerStats(req, res) {
+  res.status(200).json(await salesService.getStats(req.user.id, req.query.days));
+}
+
+module.exports = { listReviews, createReview, updateReview, deleteReview, listSales, getSellerStats };

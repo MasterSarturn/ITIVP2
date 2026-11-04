@@ -13,6 +13,8 @@ export const cart = {
   add: (productId) => post('/api/cart/items', { productId }),
   remove: (productId) => del(`/api/cart/items/${productId}`),
   clear: () => del('/api/cart'),
+  applyPromo: (code) => post('/api/cart/promo', { code }),
+  removePromo: () => del('/api/cart/promo'),
 }
 
 export const wishlist = {

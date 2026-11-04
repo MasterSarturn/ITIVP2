@@ -1,5 +1,6 @@
 const cartService = require('../services/cartService');
 const wishlistService = require('../services/wishlistService');
+const promoService = require('../services/promoService');
 const { parseUuid, parsePage } = require('../utils/validators');
 
 async function getCart(req, res) {
@@ -18,6 +19,14 @@ async function addCartItem(req, res) {
 async function removeCartItem(req, res) {
   await cartService.removeItem(req.user.id, parseUuid(req.params.productId, 'productId'));
   res.status(204).send();
+}
+
+async function applyPromo(req, res) {
+  res.status(200).json(await promoService.applyToCart(req.user, req.body));
+}
+
+async function removePromo(req, res) {
+  res.status(200).json(await promoService.removeFromCart(req.user.id));
 }
 
 async function getWishlist(req, res) {
@@ -39,6 +48,8 @@ module.exports = {
   clearCart,
   addCartItem,
   removeCartItem,
+  applyPromo,
+  removePromo,
   getWishlist,
   addToWishlist,
   removeFromWishlist

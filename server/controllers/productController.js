@@ -2,8 +2,10 @@ const productService = require('../services/productService');
 const { parsePage } = require('../utils/validators');
 
 async function getProducts(req, res) {
-  const { categorySlug, authorId, q } = req.query;
-  res.status(200).json(await productService.listCatalog({ page: parsePage(req.query.page), categorySlug, authorId, q }));
+  const { categorySlug, authorId, q, sort, minPrice, maxPrice } = req.query;
+  res.status(200).json(
+    await productService.listCatalog({ page: parsePage(req.query.page), categorySlug, authorId, q, sort, minPrice, maxPrice })
+  );
 }
 
 async function getProductById(req, res) {

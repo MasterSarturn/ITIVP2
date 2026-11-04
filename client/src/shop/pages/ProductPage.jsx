@@ -104,7 +104,7 @@ export default function ProductPage() {
     <div className="stack">
       <Link to="/" className="muted">← В каталог</Link>
       <div className="product-page">
-        <Cover product={item} large />
+        <Cover product={item} large zoom />
         <div className="stack" style={{ gap: 16 }}>
           <div>
             <span className="product-cat">{item.category?.name}</span>

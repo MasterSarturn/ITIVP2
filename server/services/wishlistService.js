@@ -7,7 +7,7 @@ const createHttpError = require('../utils/httpError');
 async function list(userId, page) {
   const result = await paginate(WishlistItem, page, {
     where: { userId },
-    include: [{ model: Product, as: 'product', attributes: ['id', 'sellerId', 'name', 'price', 'status'] }],
+    include: [{ model: Product, as: 'product', attributes: ['id', 'sellerId', 'name', 'price', 'status', 'imageKey', 'imageUrl'] }],
     order: [['createdAt', 'DESC'], ['productId', 'DESC']]
   });
 
@@ -19,7 +19,7 @@ async function list(userId, page) {
       productId: item.productId,
       addedAt: item.createdAt,
       available: await productService.isPubliclyVisible(item.product),
-      product: { id: item.product.id, name: item.product.name, price: item.product.price, status: item.product.status }
+      product: { id: item.product.id, name: item.product.name, price: item.product.price, status: item.product.status, imageUrl: item.product.imageUrl }
     });
   }
 

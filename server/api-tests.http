@@ -697,3 +697,46 @@ Authorization: Bearer {{adminLogin2.response.body.accessToken}}
 ### Скачивание после возврата (403)
 GET {{baseUrl}}/api/downloads/{{downloadId}}/content
 Authorization: Bearer {{buyerToken}}
+
+
+### ===== Каталог: сортировка и цена =====
+GET {{baseUrl}}/api/products?sort=price_asc&minPrice=100&maxPrice=1000
+
+### Неверная сортировка (400)
+GET {{baseUrl}}/api/products?sort=bad
+
+### ===== Кабинет продавца =====
+### Стать продавцом (200, новая пара токенов; повторно 409)
+POST {{baseUrl}}/profile/become-seller
+Authorization: Bearer {{accessToken}}
+
+### Сводка продавца
+GET {{baseUrl}}/api/seller/stats?days=7
+Authorization: Bearer {{accessToken}}
+
+### ===== Промокоды =====
+### Создать (админ)
+POST {{baseUrl}}/api/admin/promo-codes
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "code": "SALE10", "type": "percent", "value": 10, "minOrderAmount": 50, "maxUses": 100 }
+
+### Применить к корзине покупателя
+POST {{baseUrl}}/api/cart/promo
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "code": "sale10" }
+
+### Убрать из корзины
+DELETE {{baseUrl}}/api/cart/promo
+Authorization: Bearer {{accessToken}}
+
+### ===== Экспорт CSV и расширенная статистика (админ) =====
+GET {{baseUrl}}/api/admin/orders/export.csv?status=paid
+Authorization: Bearer {{adminToken}}
+
+###
+GET {{baseUrl}}/api/admin/stats?days=90
+Authorization: Bearer {{adminToken}}

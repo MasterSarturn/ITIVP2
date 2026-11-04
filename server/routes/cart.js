@@ -100,6 +100,54 @@ cart.delete('/items/:productId', asyncHandler(cartController.removeCartItem));
 
 /**
  * @openapi
+ * /api/cart/promo:
+ *   post:
+ *     tags: [Cart]
+ *     summary: Применить промокод к корзине
+ *     description: Один код на заказ. Скидка считается в GET /api/cart (subtotalAmount, discountAmount, totalAmount) и фиксируется при создании заказа.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code]
+ *             properties:
+ *               code: { type: string, example: SALE10 }
+ *     responses:
+ *       200:
+ *         description: Корзина с учётом скидки
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         description: Промокод не найден
+ *       409:
+ *         description: Промокод отключён, истёк, исчерпан или не подходит по минимальной сумме
+ */
+cart.post('/promo', asyncHandler(cartController.applyPromo));
+
+/**
+ * @openapi
+ * /api/cart/promo:
+ *   delete:
+ *     tags: [Cart]
+ *     summary: Убрать промокод из корзины
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Корзина без скидки
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+cart.delete('/promo', asyncHandler(cartController.removePromo));
+
+/**
+ * @openapi
  * /api/wishlist:
  *   get:
  *     tags: [Wishlist]

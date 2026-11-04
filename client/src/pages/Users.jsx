@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import * as api from '../api/admin'
 import { usePagedList } from '../hooks/usePagedList'
 import DataTable, { SearchInput, SelectFilter } from '../ui/DataTable'
+import ExportButton from '../ui/ExportButton'
 import { PageHead } from '../ui/Feedback'
 import StatusBadge, { STATUS_OPTIONS } from '../ui/StatusBadge'
 import { formatDateTime, fullName } from '../utils/format'
@@ -29,7 +30,11 @@ export default function Users() {
 
   return (
     <>
-      <PageHead title="Пользователи" subtitle="Аккаунты, роли и блокировки" />
+      <PageHead
+        title="Пользователи"
+        subtitle="Аккаунты, роли и блокировки"
+        actions={<ExportButton path="/api/admin/users/export.csv" params={list.filters} fileName="users.csv" />}
+      />
       <div className="card">
         <div className="toolbar">
           <SearchInput value={list.filters.q} onChange={(v) => list.setFilter('q', v)} placeholder="Имя, фамилия или email" />

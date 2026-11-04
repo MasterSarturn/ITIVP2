@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react
 import { useAuth } from '../auth/AuthContext'
 import { ErrorNote } from '../ui/Feedback'
 import { TextField } from '../ui/Field'
+import BrandMark from '../ui/BrandMark'
 
 // Единый вход: /admin/login ведёт в админку, /login возвращает покупателя туда, откуда он пришёл
 export default function Login() {
@@ -44,7 +45,7 @@ export default function Login() {
     <div className="login">
       <form className="card login-card" onSubmit={submit}>
         <div>
-          <div className="brand-mark" style={{ marginBottom: 16 }}>Ц</div>
+          <BrandMark style={{ marginBottom: 16 }} />
           <h1>{adminMode ? 'Вход в админку' : 'Вход'}</h1>
           <p className="muted" style={{ marginTop: 6 }}>
             {adminMode ? 'Только для администраторов магазина.' : 'Войдите, чтобы покупать и скачивать файлы.'}

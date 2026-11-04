@@ -3,7 +3,10 @@ import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useTheme } from '../theme/ThemeContext'
 import Icon from '../ui/Icon'
+import SidebarToggle from '../ui/SidebarToggle'
 import { fullName } from '../utils/format'
+import { BRAND } from '../brand'
+import BrandMark from '../ui/BrandMark'
 
 const NAV = [
   { to: '/admin', label: 'Обзор', icon: 'dashboard', end: true },
@@ -11,6 +14,7 @@ const NAV = [
   { to: '/admin/orders', label: 'Заказы', icon: 'receipt' },
   { to: '/admin/users', label: 'Пользователи', icon: 'users' },
   { to: '/admin/payments', label: 'Платежи', icon: 'card' },
+  { to: '/admin/promo-codes', label: 'Промокоды', icon: 'tag' },
   { to: '/admin/downloads', label: 'Скачивания', icon: 'download' },
   { to: '/admin/catalog', label: 'Справочники', icon: 'tag' },
 ]
@@ -47,11 +51,12 @@ export default function AdminLayout() {
 
   return (
     <div className="shell">
+      <SidebarToggle open={open} onToggle={() => setOpen((value) => !value)} />
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand">
-          <div className="brand-mark">Ц</div>
+          <BrandMark />
           <div>
-            <div className="brand-name">Цифровой магазин</div>
+            <div className="brand-name">{BRAND}</div>
             <div className="brand-sub">Админ-панель</div>
           </div>
         </div>
@@ -62,6 +67,7 @@ export default function AdminLayout() {
               {item.label}
             </NavLink>
           ))}
+          <NavLink to="/"><Icon name="store" />В магазин</NavLink>
         </nav>
         <div className="sidebar-foot">
           <div className="me">
@@ -79,9 +85,6 @@ export default function AdminLayout() {
         </div>
       </aside>
       <main className="main">
-        <button className="btn menu-toggle" onClick={() => setOpen((value) => !value)} aria-label="Меню">
-          <Icon name="menu" />
-        </button>
         <Outlet />
       </main>
     </div>

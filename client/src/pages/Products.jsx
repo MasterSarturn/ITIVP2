@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import * as api from '../api/admin'
 import { usePagedList } from '../hooks/usePagedList'
 import DataTable, { SearchInput, SelectFilter } from '../ui/DataTable'
+import ExportButton from '../ui/ExportButton'
 import { PageHead } from '../ui/Feedback'
 import Icon from '../ui/Icon'
 import StatusBadge, { STATUS_OPTIONS } from '../ui/StatusBadge'
@@ -34,7 +35,12 @@ export default function Products() {
       <PageHead
         title="Товары"
         subtitle="Все товары магазина во всех статусах"
-        actions={<Link className="btn btn-primary" to="/admin/products/new"><Icon name="plus" />Новый товар</Link>}
+        actions={(
+          <>
+            <ExportButton path="/api/admin/products/export.csv" params={list.filters} fileName="products.csv" />
+            <Link className="btn btn-primary" to="/admin/products/new"><Icon name="plus" />Новый товар</Link>
+          </>
+        )}
       />
       <div className="card">
         <div className="toolbar">

@@ -100,6 +100,25 @@ async function changeEmail(userId, body) {
   return authService.issueTokens(account);
 }
 
+// Самостоятельное повышение user -> seller. Роль лежит в JWT, поэтому токены отзываются и выдаются заново
+async function becomeSeller(userId) {
+  const user = await findActiveUser(userId);
+
+  if (user.account.status !== 'active') {
+    throw createHttpError(403, 'Аккаунт заблокирован');
+  }
+
+  if (user.account.role !== 'user') {
+    throw createHttpError(409, user.account.role === 'seller' ? 'Вы уже продавец' : 'Роль администратора менять нельзя');
+  }
+
+  await user.account.update({ role: 'seller' });
+  await authService.revokeAllTokens(userId);
+
+  audit({ id: userId }, 'profile.become-seller');
+  return authService.issueTokens(user.account);
+}
+
 // ---------- Удаление ----------
 
 // Нельзя оставить систему без активного администратора
@@ -286,6 +305,7 @@ module.exports = {
   updateProfile,
   changePassword,
   changeEmail,
+  becomeSeller,
   deleteAccount,
   listUsers,
   getUser,

@@ -79,6 +79,7 @@ reviews.delete('/:id', asyncHandler(reviewController.deleteReview));
  *       - bearerAuth: []
  *     parameters:
  *       - $ref: '#/components/parameters/Page'
+ *       - { name: productId, in: query, schema: { type: string, format: uuid } }
  *     responses:
  *       200:
  *         description: Страница продаж (productId, unitPrice, paidAt)
@@ -88,5 +89,28 @@ reviews.delete('/:id', asyncHandler(reviewController.deleteReview));
  *         $ref: '#/components/responses/Forbidden'
  */
 seller.get('/sales', authenticate, requireRole('seller', 'admin'), asyncHandler(reviewController.listSales));
+
+/**
+ * @openapi
+ * /api/seller/stats:
+ *   get:
+ *     tags: [Seller]
+ *     summary: Сводка продавца (продавец, администратор)
+ *     description: Число и сумма оплаченных продаж, динамика по дням, топ-5 товаров, число товаров по статусам. Суммы - строки.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: days, in: query, schema: { type: integer, enum: [7, 30, 90], default: 30 } }
+ *     responses:
+ *       200:
+ *         description: Сводка
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+seller.get('/stats', authenticate, requireRole('seller', 'admin'), asyncHandler(reviewController.getSellerStats));
 
 module.exports = { reviews, seller };

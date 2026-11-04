@@ -1,12 +1,72 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import * as api from '../api/admin'
+import { useImageSrc } from '../hooks/useImageSrc'
 import { useLoad } from '../hooks/usePagedList'
 import { ConfirmDialog, ErrorNote, PageHead, Skeleton, useToast } from '../ui/Feedback'
 import { SelectField, TextField } from '../ui/Field'
 import Icon from '../ui/Icon'
+import Lightbox from '../ui/Lightbox'
 import StatusBadge from '../ui/StatusBadge'
 import { formatDateTime, formatSize, fullName, parsePrice } from '../utils/format'
+
+const MAX_UPLOAD_SIZE = 50 * 1024 * 1024 // совпадает с лимитом сервера
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+
+// ---------- Обложка ----------
+
+// Выбор обложки: файл уходит на сервер вместе с формой, поэтому работает и при создании товара.
+// value - выбранный файл, null - без изменений, false - удалить текущую
+function ImagePicker({ currentUrl, value, onChange, onError }) {
+  const input = useRef(null)
+  const [preview, setPreview] = useState(null)
+  const [zoomed, setZoomed] = useState(false)
+  const { src: current } = useImageSrc(currentUrl, true) // у черновика картинка доступна только с токеном
+
+  useEffect(() => {
+    if (!(value instanceof File)) {
+      setPreview(null)
+      return undefined
+    }
+    const url = URL.createObjectURL(value)
+    setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [value])
+
+  function pick(file) {
+    if (!file) return
+    if (!IMAGE_TYPES.includes(file.type)) return onError('Подойдут изображения PNG, JPEG или WebP')
+    if (file.size > MAX_IMAGE_SIZE) return onError('Изображение больше 5 МБ')
+    onChange(file)
+  }
+
+  const shown = value === false ? null : preview ?? current
+
+  return (
+    <div className="field span-2">
+      <span className="field-label">Обложка</span>
+      <div className="image-picker">
+        {shown ? (
+          <button type="button" className="image-preview-btn" onClick={() => setZoomed(true)} aria-label="Открыть обложку на весь экран">
+            <img className="image-preview" src={shown} alt="Обложка товара" />
+          </button>
+        ) : <div className="image-preview empty">Без обложки: в каталоге будет заглушка</div>}
+        <div className="stack" style={{ gap: 8, alignItems: 'flex-start' }}>
+          <div className="row">
+            <button type="button" className="btn" onClick={() => input.current.click()}><Icon name="upload" />{shown ? 'Заменить' : 'Выбрать изображение'}</button>
+            {value === false && <button type="button" className="btn" onClick={() => onChange(null)}>Вернуть текущую</button>}
+            {value instanceof File && <button type="button" className="btn" onClick={() => onChange(null)}>{currentUrl ? 'Отменить выбор' : 'Убрать'}</button>}
+            {value === null && currentUrl && <button type="button" className="btn btn-danger" onClick={() => onChange(false)}>Убрать</button>}
+          </div>
+          <span className="field-hint">PNG, JPEG или WebP до 5 МБ. Лучше всего подходит 16:10, например 1280×800.</span>
+        </div>
+      </div>
+      {zoomed && shown && <Lightbox src={shown} alt="Обложка товара" onClose={() => setZoomed(false)} />}
+      <input ref={input} type="file" accept={IMAGE_TYPES.join(',')} hidden onChange={(e) => { pick(e.target.files[0]); e.target.value = '' }} />
+    </div>
+  )
+}
 
 // ---------- Файлы товара ----------
 
@@ -23,6 +83,10 @@ function Files({ productId, onChange }) {
 
   async function upload(file) {
     if (!file) return
+    if (file.size > MAX_UPLOAD_SIZE) {
+      toast.error(`Файл «${file.name}» больше 50 МБ`)
+      return
+    }
     setBusy(true)
     try {
       await api.products.uploadFile(productId, file, version.trim())
@@ -41,6 +105,10 @@ function Files({ productId, onChange }) {
     const target = replacing
     setReplacing(null)
     if (!file || !target) return
+    if (file.size > MAX_UPLOAD_SIZE) {
+      toast.error(`Файл «${file.name}» больше 50 МБ`)
+      return
+    }
     setBusy(true)
     try {
       await api.products.replaceFile(productId, target.id, file, version.trim())
@@ -121,18 +189,38 @@ function Files({ productId, onChange }) {
 
 // ---------- Форма товара ----------
 
-function ProductForm({ product, categories, authors, onSaved }) {
+function ProductForm({ product, categories, authors: initialAuthors, base, onSaved }) {
   const toast = useToast()
   const navigate = useNavigate()
   const [name, setName] = useState(product?.name ?? '')
   const [description, setDescription] = useState(product?.description ?? '')
   const [category, setCategory] = useState(product?.category?.slug ?? '')
   const [price, setPrice] = useState(product ? String(Number(product.price)) : '')
+  const [authors, setAuthors] = useState(initialAuthors)
+  const [newAuthor, setNewAuthor] = useState('')
+  const [authorBusy, setAuthorBusy] = useState(false)
   const [authorIds, setAuthorIds] = useState(product?.authors.map((a) => a.id) ?? [])
+  const [image, setImage] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
   const toggleAuthor = (id) => setAuthorIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]))
+
+  async function addAuthor() {
+    const name = newAuthor.trim()
+    if (!name) return
+    setAuthorBusy(true)
+    try {
+      const created = await api.authors.create({ name })
+      setAuthors((current) => [...current, created])
+      setAuthorIds((current) => [...current, created.id])
+      setNewAuthor('')
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setAuthorBusy(false)
+    }
+  }
 
   async function submit(event) {
     event.preventDefault()
@@ -148,16 +236,34 @@ function ProductForm({ product, categories, authors, onSaved }) {
     }
     setBusy(true)
     const body = { name: name.trim(), description: description.trim(), category, price: parsedPrice, authorIds }
+    let saved = product
     try {
       if (product) {
         await api.products.update(product.id, body)
-        toast.success('Товар сохранён')
-        onSaved()
       } else {
-        const created = await api.products.create(body)
-        toast.success('Товар создан как черновик: добавьте файл и опубликуйте')
-        navigate(`/admin/products/${created.id}`, { replace: true })
+        saved = await api.products.create(body)
       }
+    } catch (e) {
+      setError(e.message)
+      setBusy(false)
+      return
+    }
+
+    // Товар уже сохранён: сбой с картинкой не должен выглядеть как провал всего сохранения
+    let imageFailed = null
+    try {
+      if (image instanceof File) await api.products.setImage(saved.id, image)
+      else if (image === false) await api.products.removeImage(saved.id)
+    } catch (e) {
+      imageFailed = e.message
+    }
+
+    try {
+      if (imageFailed) toast.error(`Товар сохранён, но обложка не загружена: ${imageFailed}`)
+      else toast.success(product ? 'Товар сохранён' : 'Товар создан как черновик: добавьте файл и опубликуйте')
+      setImage(null)
+      if (product) onSaved()
+      else navigate(`${base}/${saved.id}`, { replace: true })
     } catch (e) {
       setError(e.message)
     } finally {
@@ -179,10 +285,11 @@ function ProductForm({ product, categories, authors, onSaved }) {
         />
         <TextField label="Цена, BYN" required inputMode="decimal" mono value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" hint="Не более двух знаков после запятой" />
         <TextField className="span-2" label="Описание" required multiline value={description} onChange={(e) => setDescription(e.target.value)} />
+        <ImagePicker currentUrl={product?.imageUrl} value={image} onChange={setImage} onError={toast.error} />
         <div className="field span-2">
           <span className="field-label">Авторы</span>
           {authors.length === 0 ? (
-            <span className="field-hint">Авторов пока нет. Добавьте их в «Справочниках».</span>
+            <span className="field-hint">Авторов пока нет. Добавьте первого ниже.</span>
           ) : (
             <div className="chips">
               {authors.map((author) => (
@@ -192,12 +299,23 @@ function ProductForm({ product, categories, authors, onSaved }) {
               ))}
             </div>
           )}
+          <div className="row" style={{ marginTop: 8 }}>
+            <input
+              className="input"
+              value={newAuthor}
+              onChange={(e) => setNewAuthor(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAuthor() } }}
+              placeholder="Новый автор"
+              aria-label="Имя нового автора"
+            />
+            <button type="button" className="btn" onClick={addAuthor} disabled={authorBusy || !newAuthor.trim()}>Добавить</button>
+          </div>
         </div>
       </div>
       <ErrorNote message={error} />
       <div className="row">
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Сохранение…' : product ? 'Сохранить' : 'Создать товар'}</button>
-        <Link className="btn" to="/admin/products">Отмена</Link>
+        <Link className="btn" to={base}>Отмена</Link>
       </div>
     </form>
   )
@@ -205,7 +323,8 @@ function ProductForm({ product, categories, authors, onSaved }) {
 
 // ---------- Страница ----------
 
-export default function ProductEdit() {
+// base - раздел, в котором открыт редактор: админка или кабинет продавца
+export default function ProductEdit({ base = '/admin/products' }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
@@ -217,7 +336,7 @@ export default function ProductEdit() {
   }, [])
   const product = useLoad(() => (id ? api.products.get(id) : Promise.resolve(null)), [id])
 
-  const back = <div className="crumbs"><Link to="/admin/products">← Товары</Link></div>
+  const back = <div className="crumbs"><Link to={base}>← Товары</Link></div>
   const error = refs.error ?? product.error
 
   if (error) return <><PageHead title="Товар" back={back} /><ErrorNote message={error} onRetry={() => { refs.reload(); product.reload() }} /></>
@@ -259,7 +378,7 @@ export default function ProductEdit() {
         </div>
       )}
       <div className={item ? 'grid-sidebar' : undefined} style={item ? { gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' } : undefined}>
-        <ProductForm product={item} categories={refs.data.categories} authors={refs.data.authors} onSaved={product.reload} />
+        <ProductForm product={item} categories={refs.data.categories} authors={refs.data.authors} base={base} onSaved={product.reload} />
         {item && <Files productId={item.id} onChange={() => {}} />}
       </div>
       {dialog === 'archive' && (
@@ -271,7 +390,7 @@ export default function ProductEdit() {
           onConfirm={async () => {
             await api.products.archive(item.id)
             toast.success('Товар отправлен в архив')
-            navigate('/admin/products')
+            navigate(base)
           }}
           onClose={() => setDialog(null)}
         />

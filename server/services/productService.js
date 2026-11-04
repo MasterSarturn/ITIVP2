@@ -34,6 +34,10 @@ async function isPubliclyVisible(product) {
   return account?.status === 'active';
 }
 
+async function canView(product, viewer) {
+  return isOwnerOrAdmin(product, viewer) || await isPubliclyVisible(product);
+}
+
 function loadProduct(id) {
   return Product.findByPk(id, { include: productInclude });
 }
@@ -66,7 +70,37 @@ async function findManageableProduct(id, user) {
     : createHttpError(404, 'Товар не найден');
 }
 
-async function listCatalog({ page, categorySlug, authorId, q }) {
+const CATALOG_SORTS = ['new', 'price_asc', 'price_desc', 'rating'];
+
+const AVG_RATING = sequelize.literal(
+  `COALESCE((SELECT AVG("rating") FROM "Reviews" WHERE "Reviews"."productId" = "Product"."id"), 0)`
+);
+
+// Порядок каталога; id нужен для стабильной пагинации
+function catalogOrder(sort) {
+  switch (sort) {
+    case 'price_asc': return [['price', 'ASC'], ['id', 'ASC']];
+    case 'price_desc': return [['price', 'DESC'], ['id', 'ASC']];
+    case 'rating': return [[AVG_RATING, 'DESC'], ['createdAt', 'DESC'], ['id', 'ASC']];
+    default: return DESC;
+  }
+}
+
+function parseOptionalPrice(value, name) {
+  if (value === undefined || value === '') {
+    return undefined;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isFinite(number) || number < 0) {
+    throw createHttpError(400, `Параметр ${name} должен быть неотрицательным числом`);
+  }
+
+  return number;
+}
+
+async function listCatalog({ page, categorySlug, authorId, q, sort, minPrice, maxPrice }) {
   const where = { status: 'published', sellerId: { [Op.in]: ACTIVE_SELLERS } };
 
   if (categorySlug !== undefined) {
@@ -95,7 +129,25 @@ async function listCatalog({ page, categorySlug, authorId, q }) {
     ];
   }
 
-  return paginate(Product, page, { where, include: productInclude, distinct: true });
+  const min = parseOptionalPrice(minPrice, 'minPrice');
+  const max = parseOptionalPrice(maxPrice, 'maxPrice');
+
+  if (min !== undefined && max !== undefined && min > max) {
+    throw createHttpError(400, 'minPrice не может быть больше maxPrice');
+  }
+
+  if (min !== undefined || max !== undefined) {
+    where.price = {
+      ...(min !== undefined && { [Op.gte]: min }),
+      ...(max !== undefined && { [Op.lte]: max })
+    };
+  }
+
+  const sortKey = sort === undefined ? 'new' : parseEnum(sort, CATALOG_SORTS, 'sort');
+
+  return paginate(Product, page, {
+    where, include: productInclude, distinct: true, order: catalogOrder(sortKey)
+  });
 }
 
 function listBySeller(sellerId, { page, status }) {
@@ -269,6 +321,7 @@ module.exports = {
   findVisibleProduct,
   findManageableProduct,
   isPubliclyVisible,
+  canView,
   countActiveFiles,
   listCatalog,
   listBySeller,

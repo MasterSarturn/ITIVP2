@@ -7,6 +7,7 @@ const authenticate = require('../middleware/auth');
 const { optionalAuthenticate } = authenticate;
 const requireRole = require('../middleware/requireRole');
 const uploadFile = require('../middleware/upload');
+const uploadImage = require('../middleware/uploadImage');
 const { uuidParam } = require('../utils/validators');
 
 const router = express.Router();
@@ -28,6 +29,9 @@ router.param('fileId', uuidParam);
  *       - { name: categorySlug, in: query, schema: { type: string }, description: slug категории }
  *       - { name: authorId, in: query, schema: { type: string, format: uuid } }
  *       - { name: q, in: query, schema: { type: string }, description: Поиск по названию и описанию }
+ *       - { name: sort, in: query, schema: { type: string, enum: [new, price_asc, price_desc, rating], default: new } }
+ *       - { name: minPrice, in: query, schema: { type: number, minimum: 0 } }
+ *       - { name: maxPrice, in: query, schema: { type: number, minimum: 0 } }
  *     responses:
  *       200:
  *         description: Страница товаров и общее число страниц
@@ -220,6 +224,49 @@ router.patch('/:id/status', authenticate, sellerOrAdmin, asyncHandler(productCon
  *         $ref: '#/components/responses/NotFound'
  */
 router.delete('/:id', authenticate, sellerOrAdmin, asyncHandler(productController.deleteProduct));
+
+/**
+ * @openapi
+ * /api/products/{productId}/image:
+ *   get:
+ *     tags: [Products]
+ *     summary: Обложка товара
+ *     description: Публична для опубликованных товаров; черновик и архив видят владелец и администратор.
+ *     parameters:
+ *       - $ref: '#/components/parameters/ProductIdPath'
+ *     responses:
+ *       200:
+ *         description: Изображение PNG, JPEG или WebP
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *   put:
+ *     tags: [Products]
+ *     summary: Загрузить или заменить обложку (multipart, поле image, до 5 МБ)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ProductIdPath'
+ *     responses:
+ *       200:
+ *         description: Товар с новым imageUrl
+ *       413:
+ *         description: Изображение больше 5 МБ
+ *       415:
+ *         description: Не PNG, JPEG или WebP
+ *   delete:
+ *     tags: [Products]
+ *     summary: Удалить обложку
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ProductIdPath'
+ *     responses:
+ *       204:
+ *         description: Обложка удалена
+ */
+router.get('/:productId/image', optionalAuthenticate, asyncHandler(productFileController.getImage));
+router.put('/:productId/image', authenticate, sellerOrAdmin, uploadImage, asyncHandler(productFileController.setImage));
+router.delete('/:productId/image', authenticate, sellerOrAdmin, asyncHandler(productFileController.deleteImage));
 
 /**
  * @openapi

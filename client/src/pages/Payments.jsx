@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import * as api from '../api/admin'
 import { usePagedList } from '../hooks/usePagedList'
 import DataTable, { SelectFilter } from '../ui/DataTable'
+import ExportButton from '../ui/ExportButton'
 import { PageHead } from '../ui/Feedback'
 import StatusBadge, { STATUS_OPTIONS } from '../ui/StatusBadge'
 import { formatDateTime, formatMoney, shortId } from '../utils/format'
@@ -23,7 +24,11 @@ export default function Payments() {
 
   return (
     <>
-      <PageHead title="Платежи" subtitle="Платёжные операции по заказам (только просмотр)" />
+      <PageHead
+        title="Платежи"
+        subtitle="Платёжные операции по заказам (только просмотр)"
+        actions={<ExportButton path="/api/admin/payments/export.csv" params={list.filters} fileName="payments.csv" />}
+      />
       <div className="card">
         <div className="toolbar">
           <SelectFilter label="Все статусы" value={list.filters.status} onChange={(v) => list.setFilter('status', v)} options={STATUS_OPTIONS.payment} />

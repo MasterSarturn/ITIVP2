@@ -133,6 +133,25 @@ router.patch('/email', asyncHandler(profileController.changeEmail));
 
 /**
  * @openapi
+ * /profile/become-seller:
+ *   post:
+ *     tags: [Profile]
+ *     summary: Стать продавцом (роль user -> seller)
+ *     description: Роль лежит в JWT, поэтому прежние токены отзываются и возвращается новая пара.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Новые токены с ролью seller
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       409:
+ *         description: Пользователь уже продавец или администратор
+ */
+router.post('/become-seller', asyncHandler(profileController.becomeSeller));
+
+/**
+ * @openapi
  * /profile:
  *   delete:
  *     tags: [Profile]

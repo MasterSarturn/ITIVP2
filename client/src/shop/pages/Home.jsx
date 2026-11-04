@@ -1,11 +1,42 @@
+import { useEffect, useState } from 'react'
 import * as api from '../../api/shop'
 import { usePagedList, useLoad } from '../../hooks/usePagedList'
 import { useShop } from '../../state/ShopContext'
 import { ErrorNote, Skeleton } from '../../ui/Feedback'
-import { SelectField } from '../../ui/Field'
+import { SelectField, TextField } from '../../ui/Field'
 import { Empty, Pager, ProductCard } from '../components/parts'
 
-const FILTERS = ['q', 'categorySlug', 'authorId']
+const FILTERS = ['q', 'categorySlug', 'authorId', 'sort', 'minPrice', 'maxPrice']
+const SORTS = [
+  { value: 'price_asc', label: 'Сначала дешевле' },
+  { value: 'price_desc', label: 'Сначала дороже' },
+  { value: 'rating', label: 'По рейтингу' }
+]
+
+// Цена применяется после паузы в наборе, чтобы не слать запрос на каждую цифру
+function PriceInput({ label, value, onCommit }) {
+  const [text, setText] = useState(value)
+
+  useEffect(() => setText(value), [value])
+  useEffect(() => {
+    if (text === value) return undefined
+    const timer = setTimeout(() => onCommit(text), 450)
+    return () => clearTimeout(timer)
+  }, [text])
+
+  return (
+    <TextField
+      label={label}
+      type="number"
+      min="0"
+      step="1"
+      inputMode="decimal"
+      className="price-field"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+    />
+  )
+}
 
 export default function Home() {
   const { inWishlist, toggleWish } = useShop()
@@ -34,13 +65,24 @@ export default function Home() {
             </button>
           ))}
         </div>
-        <SelectField
-          label="Автор"
-          value={filters.authorId}
-          onChange={(e) => setFilter('authorId', e.target.value)}
-          placeholder="Все авторы"
-          options={(refs.data?.authors ?? []).map((a) => ({ value: a.id, label: a.name }))}
-        />
+        <div className="filter-controls">
+          <SelectField
+            label="Автор"
+            value={filters.authorId}
+            onChange={(e) => setFilter('authorId', e.target.value)}
+            placeholder="Все авторы"
+            options={(refs.data?.authors ?? []).map((a) => ({ value: a.id, label: a.name }))}
+          />
+          <SelectField
+            label="Сортировка"
+            value={filters.sort}
+            onChange={(e) => setFilter('sort', e.target.value)}
+            placeholder="Сначала новые"
+            options={SORTS}
+          />
+          <PriceInput label="Цена от, BYN" value={filters.minPrice} onCommit={(v) => setFilter('minPrice', v)} />
+          <PriceInput label="до, BYN" value={filters.maxPrice} onCommit={(v) => setFilter('maxPrice', v)} />
+        </div>
       </div>
 
       {filters.q && (

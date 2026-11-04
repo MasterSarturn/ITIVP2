@@ -1,58 +1,66 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as api from '../api/admin'
 import { useLoad } from '../hooks/usePagedList'
 import { ErrorNote, PageHead, Skeleton } from '../ui/Feedback'
+import { RevenueChart, Stat } from '../ui/Charts'
 import StatusBadge from '../ui/StatusBadge'
 import { formatDateTime, formatMoney, formatNumber, fullName, shortId } from '../utils/format'
 
-function Stat({ label, value, unit, note, hero }) {
+const PERIODS = [7, 30, 90]
+
+function Funnel({ funnel }) {
+  const steps = [
+    { label: 'Создано заказов', value: funnel.created },
+    { label: 'Оплачено', value: funnel.paid },
+  ]
+  const max = Math.max(funnel.created, 1)
+
   return (
-    <div className={`card stat ${hero ? 'hero' : ''}`}>
-      <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}{unit && <small>{unit}</small>}</span>
-      {note && <span className="stat-note">{note}</span>}
+    <div className="card-pad stack" style={{ gap: 12 }}>
+      {steps.map((step) => (
+        <div key={step.label}>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <span>{step.label}</span>
+            <b className="mono">{formatNumber(step.value)}</b>
+          </div>
+          <div className="meter" role="img" aria-label={`${step.label}: ${step.value} из ${funnel.created}`}>
+            <span style={{ width: `${(step.value / max) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+      <p className="muted" style={{ margin: 0 }}>
+        Конверсия в оплату: <b>{funnel.conversion}%</b>. Отменено: {funnel.cancelled}, возвратов: {funnel.refunded}.
+      </p>
     </div>
   )
 }
 
-// Столбчатая диаграмма выручки по дням на чистом SVG
-function RevenueChart({ days }) {
-  const width = 720
-  const height = 200
-  const padding = { top: 12, bottom: 24, left: 8, right: 8 }
-  const max = Math.max(...days.map((day) => Number(day.revenue)), 1)
-  const slot = (width - padding.left - padding.right) / days.length
-  const plotHeight = height - padding.top - padding.bottom
-  const formatDay = (date) => date.slice(8, 10) + '.' + date.slice(5, 7)
+function Categories({ items }) {
+  if (items.length === 0) return <div className="empty"><strong>Продаж за период нет</strong></div>
+  const max = Math.max(...items.map((item) => Number(item.revenue)), 1)
 
   return (
-    <svg className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Выручка по дням за 30 дней">
-      {[0, 0.5, 1].map((part) => {
-        const y = padding.top + plotHeight * (1 - part)
-        return <line key={part} className="grid" x1={padding.left} x2={width - padding.right} y1={y} y2={y} />
-      })}
-      {days.map((day, index) => {
-        const value = Number(day.revenue)
-        const barHeight = value > 0 ? Math.max((value / max) * plotHeight, 2) : 0
-        const x = padding.left + index * slot + slot * 0.18
-        return (
-          <g key={day.date}>
-            <rect className="bar" x={x} y={padding.top + plotHeight - barHeight} width={slot * 0.64} height={barHeight} rx="2">
-              <title>{`${formatDay(day.date)}: ${formatMoney(day.revenue)} BYN, заказов: ${day.orders}`}</title>
-            </rect>
-            {(index % 5 === 0 || index === days.length - 1) && (
-              <text x={x + slot * 0.32} y={height - 6} textAnchor="middle">{formatDay(day.date)}</text>
-            )}
-          </g>
-        )
-      })}
-    </svg>
+    <ul className="bars">
+      {items.map((item) => (
+        <li key={item.id}>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <span>{item.name}</span>
+            <span className="mono nowrap">{formatMoney(item.revenue)} BYN</span>
+          </div>
+          <div className="meter" role="img" aria-label={`${item.name}: ${formatMoney(item.revenue)} BYN, продаж: ${item.sales}`}>
+            <span style={{ width: `${(Number(item.revenue) / max) * 100}%` }} />
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { data, loading, error, reload } = useLoad(api.stats, [])
+  const [days, setDays] = useState(30)
+  const { data, loading, error, reload } = useLoad(() => api.stats(days), [days])
 
   if (error) return <><PageHead title="Обзор" /><ErrorNote message={error} onRetry={reload} /></>
 
@@ -66,13 +74,23 @@ export default function Dashboard() {
   }
 
   const recentOrders = data.recentOrders ?? []
-  const monthRevenue =data.daily.reduce((sum, day) => sum + Number(day.revenue), 0)
+  const monthRevenue = data.daily.reduce((sum, day) => sum + Number(day.revenue), 0)
   const monthOrders = data.daily.reduce((sum, day) => sum + day.orders, 0)
   const staff = data.users.byRole.seller + data.users.byRole.admin
 
   return (
     <div className="stack">
-      <PageHead title="Обзор" subtitle="Сводка по магазину" />
+      <PageHead
+        title="Обзор"
+        subtitle="Сводка по магазину"
+        actions={(
+          <div className="chips" role="group" aria-label="Период">
+            {PERIODS.map((value) => (
+              <button key={value} className={`chip ${days === value ? 'on' : ''}`} aria-pressed={days === value} onClick={() => setDays(value)}>{value} дн.</button>
+            ))}
+          </div>
+        )}
+      />
 
       {data.orders.pending > 0 && (
         <div className="alert">
@@ -82,8 +100,8 @@ export default function Dashboard() {
       )}
 
       <div className="stat-grid">
-        <Stat hero label="Выручка" value={formatMoney(data.revenue)} unit="BYN" note={`За 30 дней: ${formatMoney(monthRevenue)} BYN`} />
-        <Stat label="Оплаченных заказов" value={formatNumber(data.orders.paid)} note={`За 30 дней: ${formatNumber(monthOrders)}`} />
+        <Stat hero label="Выручка" value={formatMoney(data.revenue)} unit="BYN" note={`За ${data.days} дн.: ${formatMoney(monthRevenue)} BYN`} />
+        <Stat label="Оплаченных заказов" value={formatNumber(data.orders.paid)} note={`За ${data.days} дн.: ${formatNumber(monthOrders)}`} />
         <Stat label="Опубликовано товаров" value={formatNumber(data.products.published)} note={`Черновиков: ${data.products.draft}, в архиве: ${data.products.archived}`} />
         <Stat label="Активных пользователей" value={formatNumber(data.users.byStatus.active)} note={`Продавцов и админов: ${staff}, заблокировано: ${data.users.byStatus.blocked}`} />
       </div>
@@ -91,10 +109,10 @@ export default function Dashboard() {
       <div className="grid-sidebar">
         <section className="card">
           <div className="card-head">
-            <h2>Выручка за 30 дней</h2>
+            <h2>Выручка за {data.days} дн.</h2>
             <span className="muted">Возвраты: {formatMoney(data.refunded)} BYN</span>
           </div>
-          <div className="card-pad"><RevenueChart days={data.daily} /></div>
+          <div className="card-pad"><RevenueChart days={data.daily} label={`Выручка по дням за ${data.days} дней`} /></div>
         </section>
 
         <section className="card">
@@ -112,6 +130,17 @@ export default function Dashboard() {
               ))}
             </ol>
           )}
+        </section>
+      </div>
+
+      <div className="grid-sidebar" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}>
+        <section className="card">
+          <div className="card-head"><h2>Воронка заказов</h2><span className="muted">Заказы за {data.days} дн.</span></div>
+          <Funnel funnel={data.funnel} />
+        </section>
+        <section className="card">
+          <div className="card-head"><h2>Выручка по категориям</h2><span className="muted">За {data.days} дн.</span></div>
+          <div className="card-pad"><Categories items={data.byCategory} /></div>
         </section>
       </div>
 

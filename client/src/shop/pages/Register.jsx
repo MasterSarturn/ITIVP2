@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { ErrorNote } from '../../ui/Feedback'
 import { TextField } from '../../ui/Field'
+import BrandMark from '../../ui/BrandMark'
 
 export default function Register() {
   const { status, register } = useAuth()
@@ -41,7 +42,7 @@ export default function Register() {
     <div className="login">
       <form className="card login-card" onSubmit={submit}>
         <div>
-          <div className="brand-mark" style={{ marginBottom: 16 }}>Ц</div>
+          <BrandMark style={{ marginBottom: 16 }} />
           <h1>Регистрация</h1>
           <p className="muted" style={{ marginTop: 6 }}>Аккаунт нужен, чтобы покупать товары и скачивать файлы.</p>
         </div>

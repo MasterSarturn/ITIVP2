@@ -5,7 +5,7 @@ import { useShop } from '../../state/ShopContext'
 import { ErrorNote, Skeleton, useToast } from '../../ui/Feedback'
 import StatusBadge from '../../ui/StatusBadge'
 import { formatDateTime, formatMoney, shortId } from '../../utils/format'
-import { Empty, Pager } from '../components/parts'
+import { Empty, Pager, Totals } from '../components/parts'
 
 export function MyOrders() {
   const navigate = useNavigate()
@@ -81,7 +81,12 @@ export function OrderPage() {
             <li key={item.id}><Link to={`/products/${item.product.id}`}>{item.product.name}</Link><span className="mono">{formatMoney(item.unitPrice)}</span></li>
           ))}
         </ul>
-        <div className="summary-total"><span>Итого</span><strong>{formatMoney(data.totalAmount)} <small>BYN</small></strong></div>
+        <Totals
+          subtotal={(Number(data.totalAmount) + Number(data.discountAmount)).toFixed(2)}
+          discount={data.discountAmount}
+          total={data.totalAmount}
+          promoCode={data.promoCode}
+        />
         <div className="row">
           {data.status === 'pending' && <Link className="btn btn-primary" to={`/checkout/${data.id}`}>Оплатить</Link>}
           {data.status === 'pending' && <button className="btn btn-danger" onClick={cancel}>Отменить</button>}

@@ -6,7 +6,7 @@ import { useToast } from '../ui/Feedback'
 
 const ShopContext = createContext(null)
 
-const EMPTY = { cart: { items: [], totalAmount: '0.00' }, wishIds: [], purchases: [] }
+const EMPTY = { cart: { items: [], subtotalAmount: '0.00', discountAmount: '0.00', totalAmount: '0.00', promo: null, promoProblem: null }, wishIds: [], purchases: [] }
 
 // Корзина, избранное и купленное нужны в шапке и на карточках, поэтому живут выше страниц
 export function ShopProvider({ children }) {
