@@ -127,6 +127,50 @@ const options = {
             }
           }
         },
+        ProductDraftInput: {
+          type: 'object',
+          required: ['name'],
+          description: 'Черновик хранится в MongoDB. attributes зависят от category',
+          properties: {
+            name: { type: 'string', example: 'Clean Code (черновик)' },
+            description: { type: 'string', example: 'Книга о чистом коде' },
+            price: { type: 'number', minimum: 0, nullable: true, example: 19.99 },
+            category: { type: 'string', enum: ['books', 'music', 'software'], nullable: true },
+            authorIds: { type: 'array', items: { type: 'string', format: 'uuid' } },
+            tags: { type: 'array', items: { type: 'string' }, example: ['programming', 'classic'] },
+            attributes: {
+              type: 'object',
+              description: 'books: isbn, pages, language, format. music: durationSec, genre, bitrate. software: version, os[], license',
+              example: { isbn: '9780132350884', pages: 464, language: 'en' }
+            }
+          }
+        },
+        ProductDraft: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+            sellerId: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            description: { type: 'string' },
+            price: { type: 'number', nullable: true },
+            category: { type: 'string', nullable: true },
+            authorIds: { type: 'array', items: { type: 'string', format: 'uuid' } },
+            tags: { type: 'array', items: { type: 'string' } },
+            attributes: { type: 'object' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' }
+          }
+        },
+        ProductDraftsPage: {
+          type: 'object',
+          properties: {
+            items: { type: 'array', items: { $ref: '#/components/schemas/ProductDraft' } },
+            page: { type: 'integer', example: 1 },
+            pageSize: { type: 'integer', example: 20 },
+            totalItems: { type: 'integer', example: 3 },
+            totalPages: { type: 'integer', example: 1 }
+          }
+        },
         ProductsPage: {
           type: 'object',
           properties: {

@@ -13,6 +13,7 @@ import BrandMark from '../ui/BrandMark'
 const NAV = [
   { to: '/seller', label: 'Обзор', icon: 'dashboard', end: true },
   { to: '/seller/products', label: 'Мои товары', icon: 'box' },
+  { to: '/seller/drafts', label: 'Черновики', icon: 'edit' },
   { to: '/seller/sales', label: 'Продажи', icon: 'receipt' },
 ]
 

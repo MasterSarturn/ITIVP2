@@ -740,3 +740,80 @@ Authorization: Bearer {{adminToken}}
 ###
 GET {{baseUrl}}/api/admin/stats?days=90
 Authorization: Bearer {{adminToken}}
+
+# ============== Черновики товаров (MongoDB, /api/seller/drafts) ==============
+
+### Создать черновик (201) — ID сохраняется в @draftId
+# @name createDraft
+POST {{baseUrl}}/api/seller/drafts
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Clean Code (черновик)",
+  "description": "Книга о чистом коде",
+  "price": 19.99,
+  "category": "books",
+  "tags": ["Programming", "classic"],
+  "attributes": { "isbn": "9780132350884", "pages": 464, "language": "en" }
+}
+
+###
+@draftId = {{createDraft.response.body.id}}
+
+### Список своих черновиков (200)
+GET {{baseUrl}}/api/seller/drafts
+Authorization: Bearer {{adminToken}}
+
+### Фильтр по тегу и названию (200)
+GET {{baseUrl}}/api/seller/drafts?tag=classic&q=clean
+Authorization: Bearer {{adminToken}}
+
+### Заменить черновик целиком (200)
+PUT {{baseUrl}}/api/seller/drafts/{{draftId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Clean Code, 2-е издание",
+  "price": 24.5,
+  "category": "books",
+  "tags": ["programming"],
+  "attributes": { "pages": 520, "format": "pdf" }
+}
+
+### Недопустимая характеристика для категории (400)
+POST {{baseUrl}}/api/seller/drafts
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "Альбом", "category": "music", "attributes": { "isbn": "123" } }
+
+### Без названия (400)
+POST {{baseUrl}}/api/seller/drafts
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "description": "нет name" }
+
+### Некорректный ObjectId (400)
+PUT {{baseUrl}}/api/seller/drafts/not-an-id
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "x" }
+
+### Несуществующий черновик (404)
+DELETE {{baseUrl}}/api/seller/drafts/507f1f77bcf86cd799439011
+Authorization: Bearer {{adminToken}}
+
+### Обычный пользователь без роли seller (403)
+GET {{baseUrl}}/api/seller/drafts
+Authorization: Bearer {{accessToken}}
+
+### Без токена (401)
+GET {{baseUrl}}/api/seller/drafts
+
+### Удалить черновик (204)
+DELETE {{baseUrl}}/api/seller/drafts/{{draftId}}
+Authorization: Bearer {{adminToken}}

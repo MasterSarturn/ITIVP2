@@ -22,6 +22,17 @@ function uuidParam(req, res, next, value, name) {
   }
 }
 
+const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
+
+// router.param(name, objectIdParam): проверяет формат MongoDB ObjectId
+function objectIdParam(req, res, next, value, name) {
+  if (typeof value !== 'string' || !OBJECT_ID_PATTERN.test(value)) {
+    return next(createHttpError(400, `Параметр ${name} должен быть корректным ObjectId`));
+  }
+
+  next();
+}
+
 function parsePage(value) {
   if (value === undefined) {
     return 1;
@@ -137,6 +148,7 @@ module.exports = {
   MIN_PASSWORD_LENGTH,
   parseUuid,
   uuidParam,
+  objectIdParam,
   parsePage,
   requireBody,
   parseRequiredString,

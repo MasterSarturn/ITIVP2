@@ -10,6 +10,56 @@ let accessToken = null
 let refreshing = null
 let onAuthLost = () => {}
 
+// Недоступность сервера: хранится вне React, чтобы её мог выставить любой запрос
+let serverDown = false
+const downListeners = new Set()
+
+function setServerDown(value) {
+  if (serverDown === value) return
+  serverDown = value
+  downListeners.forEach((listener) => listener())
+}
+
+export function subscribeServerDown(listener) {
+  downListeners.add(listener)
+  return () => downListeners.delete(listener)
+}
+
+export const isServerDown = () => serverDown
+
+// 502/503/504 — ответ прокси или шлюза. Наш API всегда отвечает JSON,
+// поэтому 500 без JSON-тела тоже пришёл не от него (dev-прокси при отказе соединения)
+function isGatewayError(status, data) {
+  return status === 502 || status === 503 || status === 504 || (status === 500 && data === null)
+}
+
+// Единая точка fetch: сетевой сбой (сервер выключен, нет сети) — тоже «сервер недоступен»
+async function safeFetch(url, init) {
+  try {
+    return await fetch(url, init)
+  } catch {
+    setServerDown(true)
+    throw new ApiError(0, 'Сервер недоступен')
+  }
+}
+
+// Опрос со страницы «сервер недоступен»: любой ответ самого API (даже 404) значит, что он поднялся
+export async function pingServer() {
+  try {
+    const response = await fetch('/api/health', { cache: 'no-store' })
+    const text = await response.text()
+    let data = null
+    try {
+      data = text ? JSON.parse(text) : null
+    } catch {
+      data = null
+    }
+    return !isGatewayError(response.status, data)
+  } catch {
+    return false
+  }
+}
+
 export function setAccessToken(token) {
   accessToken = token
 }
@@ -28,6 +78,10 @@ async function parse(response) {
     data = null
   }
   if (!response.ok) {
+    if (isGatewayError(response.status, data)) {
+      setServerDown(true)
+      throw new ApiError(response.status, 'Сервер недоступен')
+    }
     throw new ApiError(response.status, data?.error ?? `Ошибка запроса (${response.status})`)
   }
   return data
@@ -35,7 +89,7 @@ async function parse(response) {
 
 // Параллельные вызовы делят один refresh: старый refresh-токен после обмена недействителен
 export function refreshSession() {
-  refreshing ??= fetch('/auth/refresh', { method: 'POST', credentials: 'include' })
+  refreshing ??= safeFetch('/auth/refresh', { method: 'POST', credentials: 'include' })
     .then(parse)
     .then((data) => {
       accessToken = data.accessToken
@@ -67,7 +121,7 @@ async function send(path, { method = 'GET', params, body, form }, token) {
     headers['Content-Type'] = 'application/json'
     payload = JSON.stringify(body)
   }
-  return fetch(buildUrl(path, params), { method, headers, body: payload, credentials: 'include' })
+  return safeFetch(buildUrl(path, params), { method, headers, body: payload, credentials: 'include' })
 }
 
 export async function request(path, options = {}) {

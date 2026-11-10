@@ -30,7 +30,6 @@ export const orders = {
   cancel: (id) => post(`/api/orders/${id}/cancel`),
   payments: (id) => get(`/api/orders/${id}/payments`),
   pay: (id) => post(`/api/orders/${id}/payments`),
-  // только вне production: имитация ответа платёжного провайдера
   simulate: (paymentId, status) => post(`/api/dev/payments/${paymentId}/simulate`, { status }),
 }
 
@@ -61,7 +60,6 @@ export async function listAll(fetchPage) {
   return items
 }
 
-// Файл отдаётся только с Bearer, поэтому скачиваем в blob и отдаём браузеру временную ссылку
 export async function downloadFile(orderItemId, productFileId, fileName) {
   const grant = await post('/api/downloads', { orderItemId, productFileId })
   const response = await request(`/api/downloads/${grant.id}/content`, { raw: true })

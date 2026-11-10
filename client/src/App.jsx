@@ -15,6 +15,7 @@ import PromoCodes from './pages/PromoCodes'
 import UserDetail from './pages/UserDetail'
 import Users from './pages/Users'
 import SellerDashboard from './seller/SellerDashboard'
+import SellerDrafts from './seller/SellerDrafts'
 import SellerLayout from './seller/SellerLayout'
 import SellerProducts from './seller/SellerProducts'
 import SellerSales from './seller/SellerSales'
@@ -34,12 +35,14 @@ import { ShopProvider } from './state/ShopContext'
 import { ThemeProvider } from './theme/ThemeContext'
 import ErrorBoundary from './ui/ErrorBoundary'
 import ScrollTop from './ui/ScrollTop'
+import ServerGate from './ui/ServerGate'
 import { ToastProvider } from './ui/Feedback'
 
 export default function App() {
   return (
     <ThemeProvider>
       <ErrorBoundary>
+      <ServerGate>
       <ToastProvider>
         <AuthProvider>
           <BrowserRouter>
@@ -67,6 +70,7 @@ export default function App() {
                   <Route path="products" element={<SellerProducts />} />
                   <Route path="products/new" element={<ProductEdit base="/seller/products" />} />
                   <Route path="products/:id" element={<ProductEdit base="/seller/products" />} />
+                  <Route path="drafts" element={<SellerDrafts />} />
                   <Route path="sales" element={<SellerSales />} />
                 </Route>
                 <Route element={<ShopLayout />}>
@@ -90,6 +94,7 @@ export default function App() {
           </BrowserRouter>
         </AuthProvider>
       </ToastProvider>
+      </ServerGate>
       </ErrorBoundary>
     </ThemeProvider>
   )
